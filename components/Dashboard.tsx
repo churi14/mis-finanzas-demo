@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; 
-import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut, User } from 'lucide-react';
 import { Transaction, IncomeSource } from '@/types/dashboard';
 import { supabase } from '@/lib/supabase';
 
@@ -28,6 +28,9 @@ export default function Dashboard() {
   const [config, setConfig] = useState({ frequency: 'mensual', startDay: 1 });
   const [viewDate, setViewDate] = useState(new Date()); 
   
+  // ESTADO PARA EL PERFIL DEL USUARIO
+  const [userProfile, setUserProfile] = useState({ name: '', avatar: '', email: '' });
+  
   // MODALES
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
@@ -51,14 +54,24 @@ export default function Dashboard() {
   const fetchEverything = async () => {
     setLoading(true);
     
-    // Verificar sesión
+    // 1. Verificar sesión y OBTENER PERFIL
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
         router.push('/login');
         return;
     }
 
-    // 1. Cargar Gastos
+    // EXTRAER DATOS DE GOOGLE
+    const { user_metadata, email } = session.user;
+    if (user_metadata) {
+        setUserProfile({
+            name: user_metadata.full_name || user_metadata.name || 'Usuario',
+            avatar: user_metadata.avatar_url || user_metadata.picture || '',
+            email: email || ''
+        });
+    }
+
+    // 2. Cargar Gastos
     const { data: txData } = await supabase.from('transactions').select('*').order('date', { ascending: false });
     if (txData) {
       const formattedTx: Transaction[] = txData.map((item: any) => ({
@@ -67,7 +80,7 @@ export default function Dashboard() {
       setDbTransactions(formattedTx);
     }
 
-    // 2. Cargar Ingresos
+    // 3. Cargar Ingresos
     const { data: incData } = await supabase.from('incomes').select('*').order('date', { ascending: false });
     if (incData) {
         const formattedInc: IncomeSource[] = incData.map((item: any) => ({
@@ -76,7 +89,7 @@ export default function Dashboard() {
         setIncomes(formattedInc);
     }
 
-    // 3. Cargar Ahorros
+    // 4. Cargar Ahorros
     const { data: savData } = await supabase.from('savings_logs').select('amount');
     if (savData) {
         const totalSaved = savData.reduce((acc, curr) => acc + curr.amount, 0);
@@ -301,11 +314,25 @@ export default function Dashboard() {
       {/* SIDEBAR */}
       <aside className="w-full md:w-72 bg-white border-r border-gray-200 flex flex-col p-6 hidden md:flex">
         
-        {/* LOGO CORREGIDO - AHORA DICE EnQuéGasto */}
         <div className="flex items-center gap-2 mb-10 text-xl font-black tracking-tight text-gray-900">
           <div className="bg-black text-white p-1.5 rounded-lg"><Wallet size={20} /></div> 
           EnQuéGasto
         </div>
+
+        {/* PERFIL DE USUARIO (SOLO DESKTOP) */}
+        {userProfile.name && (
+          <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3">
+             {userProfile.avatar ? (
+                <img src={userProfile.avatar} alt="Perfil" className="w-10 h-10 rounded-full object-cover border border-gray-200" />
+             ) : (
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold"><User size={20}/></div>
+             )}
+             <div className="overflow-hidden">
+                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">HOLA,</p>
+                <p className="text-sm font-bold text-gray-900 truncate">{userProfile.name.split(' ')[0]}</p>
+             </div>
+          </div>
+        )}
 
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl mb-6 shadow-xl relative overflow-hidden border border-slate-700">
           <div className="relative z-10">
@@ -342,12 +369,19 @@ export default function Dashboard() {
       {/* MAIN */}
       <main className="flex-1 p-6 lg:p-10 overflow-y-auto">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
              <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Tu Dashboard</h1>
-             <button onClick={handleLogout} className="md:hidden bg-red-50 text-red-500 p-2 rounded-lg"><LogOut size={20}/></button>
+             
+             {/* PERFIL Y LOGOUT MÓVIL */}
+             <div className="flex items-center gap-3 md:hidden">
+                {userProfile.avatar && (
+                    <img src={userProfile.avatar} alt="Perfil" className="w-9 h-9 rounded-full border border-gray-200" />
+                )}
+                <button onClick={handleLogout} className="bg-red-50 text-red-500 p-2 rounded-lg"><LogOut size={20}/></button>
+             </div>
           </div>
           
-          <div className="flex items-center gap-2 self-center md:self-auto">
+          <div className="flex items-center gap-2 self-center md:self-auto hidden md:flex">
             <button onClick={() => changePeriod(-1)} className="p-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 shadow-sm"><ChevronLeft size={22} /></button>
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm px-6 py-2 min-w-[240px] flex flex-col items-center relative">
                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">ESTAS VIENDO</span>
