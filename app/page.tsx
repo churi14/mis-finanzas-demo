@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Wallet, ArrowRight, CreditCard, PieChart, Lock } from 'lucide-react';
 import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar';
 
 export default function Home() {
   return (

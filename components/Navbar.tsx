@@ -1,79 +1,31 @@
-"use client";
-
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { LogOut, User } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
-  const router = useRouter();
-
-  // Verificamos si hay sesión al cargar la página
-  useEffect(() => {
-    // 1. Obtener sesión actual
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-    };
-    checkUser();
-
-    // 2. Escuchar cambios (si se loguea o desloguea)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.refresh();
-  };
-
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-        
-        {/* LOGO */}
-        <Link href="/" className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          FinanzasApp
+    <nav className="border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-tight hover:opacity-80 transition-opacity">
+          <div className="bg-black text-white p-1.5 rounded-lg"><Wallet size={20} /></div> 
+          EnQuéGasto
         </Link>
 
-        {/* MENU DERECHA */}
-        <div className="flex items-center gap-4">
-          {user ? (
-            // SI ESTÁ LOGUEADO
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-1 rounded-full">
-                <User size={14} />
-                <span className="hidden sm:inline">{user.email}</span>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-                title="Cerrar Sesión"
-              >
-                <LogOut size={20} />
-              </button>
-            </div>
-          ) : (
-            // SI NO ESTÁ LOGUEADO (MODO GUEST)
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded">
-                Modo Demo
-              </span>
-              <Link 
-                href="/login"
-                className="px-4 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-all"
-              >
-                Ingresar
-              </Link>
-            </div>
-          )}
+        {/* Links de Navegación (Desktop) */}
+        <div className="hidden md:flex gap-8 text-sm font-bold text-slate-500">
+          <Link href="/" className="hover:text-black transition-colors">Inicio</Link>
+          <Link href="/faq" className="hover:text-black transition-colors">Preguntas Frecuentes</Link>
+          <Link href="/about" className="hover:text-black transition-colors">Sobre Nosotros</Link>
+        </div>
+
+        {/* Botones de Acción */}
+        <div className="flex gap-4">
+          <Link href="/login" className="text-sm font-bold text-slate-500 hover:text-black py-2.5 px-4 transition-colors hidden sm:block">
+            Ingresar
+          </Link>
+          <Link href="/dashboard" className="bg-black text-white text-sm font-bold py-2.5 px-6 rounded-full hover:bg-gray-800 transition-all shadow-lg shadow-gray-200">
+            Ir al Dashboard
+          </Link>
         </div>
       </div>
     </nav>
