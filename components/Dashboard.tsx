@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp } from 'lucide-react';
+import { useRouter } from 'next/navigation'; 
+import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut } from 'lucide-react';
 import { Transaction, IncomeSource } from '@/types/dashboard';
+import { supabase } from '@/lib/supabase';
 
-// Importamos los componentes (Incluido el NUEVO AddSavingsModal)
+// Componentes
 import StatsCards from './dashboard/StatsCards';
 import TransactionInput from './dashboard/TransactionInput';
 import TransactionList from './dashboard/TransactionList';
 import ChartsSection from './dashboard/ChartsSection';
 import EditTransactionModal from './dashboard/EditTransactionModal';
-import AddSavingsModal from './dashboard/AddSavingsModal'; // <--- IMPORTANTE
+import AddSavingsModal from './dashboard/AddSavingsModal';
 
 // UTILS
 const formatMoney = (val: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(val);
@@ -20,34 +22,77 @@ const formatDate = (dateString: string) => {
     return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 };
 
-// DATOS INICIALES
-const MOCK_INCOMES_LIST: IncomeSource[] = [
-  { id: 1, date: new Date().toISOString(), desc: 'Sueldo Principal', amount: 850000 },
-];
-const MOCK_DB_TRANSACTIONS: Transaction[] = [
-  { id: 1, date: new Date().toISOString(), desc: 'Coto Semanal', amount: 45000, source: 'mes', categoryId: 'super' },
-];
-
 export default function Dashboard() {
+  const router = useRouter(); 
+  const [loading, setLoading] = useState(true);
   const [config, setConfig] = useState({ frequency: 'mensual', startDay: 1 });
   const [viewDate, setViewDate] = useState(new Date()); 
   
   // MODALES
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
-  const [showSavingsModal, setShowSavingsModal] = useState(false); // <--- NUEVO ESTADO
+  const [showSavingsModal, setShowSavingsModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // DATOS
-  const [incomes, setIncomes] = useState<IncomeSource[]>(MOCK_INCOMES_LIST);
-  const [dbTransactions, setDbTransactions] = useState<Transaction[]>(MOCK_DB_TRANSACTIONS); 
+  const [incomes, setIncomes] = useState<IncomeSource[]>([]);
+  const [dbTransactions, setDbTransactions] = useState<Transaction[]>([]); 
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]); 
   const [newIncome, setNewIncome] = useState({ desc: '', amount: '' });
 
   // AHORROS
-  const [savingsBalance, setSavingsBalance] = useState(320000); 
+  const [totalDepositedSavings, setTotalDepositedSavings] = useState(0); 
 
-  // LOGICA PERIODOS
+  // --- CARGA INICIAL ---
+  useEffect(() => {
+    fetchEverything();
+  }, []);
+
+  const fetchEverything = async () => {
+    setLoading(true);
+    
+    // Verificar sesión
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        router.push('/login');
+        return;
+    }
+
+    // 1. Cargar Gastos
+    const { data: txData } = await supabase.from('transactions').select('*').order('date', { ascending: false });
+    if (txData) {
+      const formattedTx: Transaction[] = txData.map((item: any) => ({
+        id: item.id, date: item.date, desc: item.description, amount: item.amount, source: item.source, categoryId: item.category_id, isInstallment: item.is_installment, installmentData: item.installment_data
+      }));
+      setDbTransactions(formattedTx);
+    }
+
+    // 2. Cargar Ingresos
+    const { data: incData } = await supabase.from('incomes').select('*').order('date', { ascending: false });
+    if (incData) {
+        const formattedInc: IncomeSource[] = incData.map((item: any) => ({
+            id: item.id, date: item.date, desc: item.description, amount: item.amount
+        }));
+        setIncomes(formattedInc);
+    }
+
+    // 3. Cargar Ahorros
+    const { data: savData } = await supabase.from('savings_logs').select('amount');
+    if (savData) {
+        const totalSaved = savData.reduce((acc, curr) => acc + curr.amount, 0);
+        setTotalDepositedSavings(totalSaved);
+    }
+
+    setLoading(false);
+  };
+
+  // --- LOGOUT ---
+  const handleLogout = async () => {
+      await supabase.auth.signOut();
+      router.push('/login'); 
+  };
+
+  // --- LOGICA PERIODOS ---
   const period = useMemo(() => {
     const year = viewDate.getFullYear();
     const month = viewDate.getMonth();
@@ -109,7 +154,7 @@ export default function Dashboard() {
       }, 0);
   }, [dbTransactions]);
 
-  const saldoAcumuladoFinal = savingsBalance - totalSavingsSpentHistory;
+  const saldoAcumuladoFinal = totalDepositedSavings - totalSavingsSpentHistory;
 
   // HANDLERS
   const changePeriod = (inc: number) => { 
@@ -120,49 +165,77 @@ export default function Dashboard() {
   };
   const jumpToDate = (m: number, y: number) => setViewDate(new Date(y, m, config.startDay));
 
+  const handleAddTransaction = async (newTxData: any) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return alert("Iniciá sesión para guardar.");
+
+      const txDate = new Date(viewDate);
+      const now = new Date();
+      if (txDate.getMonth() === now.getMonth()) txDate.setDate(now.getDate());
+      else txDate.setDate(period.start.getDate());
+
+      const amount = Number(newTxData.amount);
+      const isCredit = newTxData.isCredit;
+      const installments = Number(newTxData.installments);
+      const finalAmount = isCredit ? (amount / installments) : amount;
+      const isInstallment = isCredit && installments > 1;
+      const installmentData = isInstallment ? { totalAmount: amount, count: installments, bank: newTxData.bank || 'Banco', brand: newTxData.brand } : null;
+
+      const { data, error } = await supabase.from('transactions').insert({
+        user_id: user.id, description: newTxData.desc, amount: finalAmount, date: txDate.toISOString(),
+        source: isCredit ? 'mes' : newTxData.source, category_id: newTxData.categoryId, is_installment: isInstallment, installment_data: installmentData
+      }).select().single();
+
+      if (error) alert("Error: " + error.message);
+      else if (data) {
+        const newTx: Transaction = { id: data.id, date: data.date, desc: data.description, amount: data.amount, source: data.source, categoryId: data.category_id, isInstallment: data.is_installment, installmentData: data.installment_data };
+        setDbTransactions(prev => [newTx, ...prev]);
+      }
+  };
+
+  const handleDeleteTransaction = async (id: number) => {
+      const { error } = await supabase.from('transactions').delete().eq('id', id);
+      if (error) alert("No se pudo borrar. Si es una cuota, intentá borrar la original.");
+      else setDbTransactions(prev => prev.filter(tx => tx.id !== id));
+  };
+
   const handleUpdateTransaction = (updatedTx: Transaction) => {
     const newDb = dbTransactions.map(tx => (tx.id === updatedTx.id ? updatedTx : tx));
     setDbTransactions(newDb);
     setEditingTransaction(null);
   };
 
-  const handleDeleteTransaction = (id: number) => {
-      setDbTransactions(dbTransactions.filter(tx => tx.id !== id));
-  };
-
-  const handleAddTransaction = (newTxData: any) => {
-      const txDate = new Date(viewDate);
-      const now = new Date();
-      if (txDate.getMonth() === now.getMonth()) {
-          txDate.setDate(now.getDate());
-      } else {
-          txDate.setDate(period.start.getDate());
-      }
-
-      const amount = Number(newTxData.amount);
-      const isCredit = newTxData.isCredit;
-      const installments = Number(newTxData.installments);
-      const newTransaction: Transaction = {
-          id: Date.now(), date: txDate.toISOString(), desc: newTxData.desc,
-          amount: isCredit ? (amount / installments) : amount, 
-          source: isCredit ? 'mes' : newTxData.source, 
-          categoryId: newTxData.categoryId,
-          isInstallment: isCredit && installments > 1,
-          installmentData: isCredit && installments > 1 ? { totalAmount: amount, count: installments, bank: newTxData.bank || 'Banco', brand: newTxData.brand } : undefined
-      };
-      setDbTransactions([...dbTransactions, newTransaction]);
-  };
-
-  const addIncome = () => {
+  const addIncome = async () => {
     if(!newIncome.desc || !newIncome.amount) return;
-    setIncomes([...incomes, { id: Date.now(), date: new Date().toISOString(), desc: newIncome.desc, amount: Number(newIncome.amount)}]);
-    setNewIncome({desc:'', amount:''});
-  };
-  const removeIncome = (id: number) => setIncomes(incomes.filter(i => i.id !== id));
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-  // NUEVA FUNCIÓN AHORROS (Usa el Modal)
-  const handleAddSavings = (amount: number) => {
-      setSavingsBalance(prev => prev + amount);
+    const { data, error } = await supabase.from('incomes').insert({
+        user_id: user.id, description: newIncome.desc, amount: Number(newIncome.amount), date: new Date().toISOString()
+    }).select().single();
+
+    if (data) {
+        setIncomes([...incomes, { id: data.id, date: data.date, desc: data.description, amount: data.amount }]);
+        setNewIncome({desc:'', amount:''});
+    }
+  };
+
+  const removeIncome = async (id: number) => {
+    const { error } = await supabase.from('incomes').delete().eq('id', id);
+    if(!error) setIncomes(incomes.filter(i => i.id !== id));
+  };
+
+  const handleAddSavings = async (amount: number) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { error } = await supabase.from('savings_logs').insert({
+          user_id: user.id, amount: amount, date: new Date().toISOString()
+      });
+
+      if (!error) {
+          setTotalDepositedSavings(prev => prev + amount);
+      }
   };
 
   const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0); 
@@ -173,68 +246,40 @@ export default function Dashboard() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-gray-50 text-gray-800 flex flex-col md:flex-row font-sans relative">
       
-      {/* MODAL NUEVO AHORROS */}
-      {showSavingsModal && (
-        <AddSavingsModal 
-            onClose={() => setShowSavingsModal(false)}
-            onAdd={handleAddSavings}
-        />
-      )}
+      {loading && <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={48} /></div>}
+
+      {showSavingsModal && <AddSavingsModal onClose={() => setShowSavingsModal(false)} onAdd={handleAddSavings} />}
 
       {/* MODAL CONFIG */}
       {showConfigModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-md transition-all">
             <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
-                <div className="bg-gray-50 p-6 border-b border-gray-100">
-                    <h3 className="font-black text-xl text-gray-900 tracking-tight">Configurar Ciclo</h3>
-                    <p className="text-xs text-gray-500 mt-1 font-medium">Define cómo se agrupan tus finanzas</p>
-                </div>
+                <div className="bg-gray-50 p-6 border-b border-gray-100"><h3 className="font-black text-xl text-gray-900 tracking-tight">Configurar Ciclo</h3></div>
                 <div className="p-6 space-y-6">
                     <div className="space-y-3">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Frecuencia</label>
                         <div className="grid grid-cols-2 gap-3">
-                            <button onClick={() => setConfig({...config, frequency: 'mensual'})} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${config.frequency === 'mensual' ? 'border-black bg-gray-900 text-white shadow-lg scale-105' : 'border-gray-100 text-gray-400 hover:border-gray-300 hover:bg-gray-50'}`}>
-                                <Calendar size={20} /><span className="text-sm font-bold">Mensual</span>
-                            </button>
-                            <button onClick={() => setConfig({...config, frequency: 'quincenal'})} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${config.frequency === 'quincenal' ? 'border-black bg-gray-900 text-white shadow-lg scale-105' : 'border-gray-100 text-gray-400 hover:border-gray-300 hover:bg-gray-50'}`}>
-                                <div className="flex gap-0.5"><div className="w-1 h-3 bg-current rounded-full"></div><div className="w-1 h-3 bg-current rounded-full opacity-50"></div></div><span className="text-sm font-bold">Quincenal</span>
-                            </button>
+                            <button onClick={() => setConfig({...config, frequency: 'mensual'})} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${config.frequency === 'mensual' ? 'border-black bg-gray-900 text-white shadow-lg scale-105' : 'border-gray-100 text-gray-400 hover:border-gray-300 hover:bg-gray-50'}`}><Calendar size={20} /><span className="text-sm font-bold">Mensual</span></button>
+                            <button onClick={() => setConfig({...config, frequency: 'quincenal'})} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${config.frequency === 'quincenal' ? 'border-black bg-gray-900 text-white shadow-lg scale-105' : 'border-gray-100 text-gray-400 hover:border-gray-300 hover:bg-gray-50'}`}><div className="flex gap-0.5"><div className="w-1 h-3 bg-current rounded-full"></div><div className="w-1 h-3 bg-current rounded-full opacity-50"></div></div><span className="text-sm font-bold">Quincenal</span></button>
                         </div>
                     </div>
                     <div className="space-y-3">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Día de Inicio</label>
-                        <div className="relative">
-                            <input type="number" min="1" max="31" value={config.startDay} onChange={(e) => setConfig({...config, startDay: Number(e.target.value)})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-lg font-bold rounded-xl p-4 outline-none focus:ring-2 focus:ring-black transition-all pl-12" />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><Calendar size={18} /></div>
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 uppercase">del mes</span>
-                        </div>
+                        <div className="relative"><input type="number" min="1" max="31" value={config.startDay} onChange={(e) => setConfig({...config, startDay: Number(e.target.value)})} className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-lg font-bold rounded-xl p-4 outline-none focus:ring-2 focus:ring-black transition-all pl-12" /><div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"><Calendar size={18} /></div><span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 uppercase">del mes</span></div>
                     </div>
                 </div>
-                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
-                    <button onClick={() => setShowConfigModal(false)} className="flex-1 py-3.5 rounded-xl font-bold text-gray-500 hover:bg-white hover:text-gray-800 transition-colors">Cancelar</button>
-                    <button onClick={() => setShowConfigModal(false)} className="flex-1 py-3.5 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5">Guardar</button>
-                </div>
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3"><button onClick={() => setShowConfigModal(false)} className="flex-1 py-3.5 rounded-xl font-bold text-gray-500 hover:bg-white hover:text-gray-800 transition-colors">Cancelar</button><button onClick={() => setShowConfigModal(false)} className="flex-1 py-3.5 rounded-xl bg-blue-600 text-white font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all transform hover:-translate-y-0.5">Guardar</button></div>
             </div>
         </div>
       )}
 
-      {/* MODAL EDICIÓN */}
-      {editingTransaction && (
-        <EditTransactionModal 
-            transaction={editingTransaction} 
-            onClose={() => setEditingTransaction(null)}
-            onSave={handleUpdateTransaction}
-        />
-      )}
+      {editingTransaction && <EditTransactionModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} onSave={handleUpdateTransaction} />}
 
       {/* MODAL INGRESOS */}
       {showIncomeModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-                <div className="bg-black text-white p-5 flex justify-between items-center">
-                  <div><h3 className="font-bold text-xl flex items-center gap-2">Mis Ingresos</h3></div>
-                  <button onClick={() => setShowIncomeModal(false)} className="hover:text-gray-300"><X size={20}/></button>
-                </div>
+                <div className="bg-black text-white p-5 flex justify-between items-center"><div><h3 className="font-bold text-xl flex items-center gap-2">Mis Ingresos</h3></div><button onClick={() => setShowIncomeModal(false)} className="hover:text-gray-300"><X size={20}/></button></div>
                 <div className="p-6">
                     <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mb-6">
                         <div className="flex gap-2 mb-2">
@@ -255,28 +300,18 @@ export default function Dashboard() {
 
       {/* SIDEBAR */}
       <aside className="w-full md:w-72 bg-white border-r border-gray-200 flex flex-col p-6 hidden md:flex">
-        <div className="flex items-center gap-2 mb-10 text-gray-900 font-black text-2xl tracking-tight">
+        
+        {/* LOGO CORREGIDO - AHORA DICE EnQuéGasto */}
+        <div className="flex items-center gap-2 mb-10 text-xl font-black tracking-tight text-gray-900">
           <div className="bg-black text-white p-1.5 rounded-lg"><Wallet size={20} /></div> 
-          FINANZAS<span className="text-blue-600">PRO</span>
+          EnQuéGasto
         </div>
 
-        {/* TARJETA MIS AHORROS */}
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl mb-6 shadow-xl relative overflow-hidden border border-slate-700">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-2">
-                    <div className="bg-white/20 p-2 rounded-full"><TrendingUp size={16} className="text-yellow-400" /></div>
-                    <p className="text-sm font-bold text-slate-200 uppercase tracking-wider">MIS AHORROS</p>
-                </div>
-                
-                {/* BOTON DE AGREGAR AHORROS (ACTIVA EL NUEVO MODAL) */}
-                <button 
-                    onClick={() => setShowSavingsModal(true)} 
-                    className="bg-white/10 hover:bg-white/20 p-2 rounded-xl text-white transition-all flex items-center justify-center backdrop-blur-sm" 
-                    title="Ingresar Dinero"
-                >
-                    <Plus size={18} />
-                </button>
+                <div className="flex items-center gap-2"><div className="bg-white/20 p-2 rounded-full"><TrendingUp size={16} className="text-yellow-400" /></div><p className="text-sm font-bold text-slate-200 uppercase tracking-wider">MIS AHORROS</p></div>
+                <button onClick={() => setShowSavingsModal(true)} className="bg-white/10 hover:bg-white/20 p-2 rounded-xl text-white transition-all flex items-center justify-center backdrop-blur-sm" title="Ingresar Dinero"><Plus size={18} /></button>
             </div>
             <p className="text-3xl font-extrabold mb-1 tracking-tight">{formatMoney(saldoAcumuladoFinal)}</p>
             <p className="text-[10px] text-slate-400 font-medium mb-6">Plata acumulada histórica</p>
@@ -288,57 +323,45 @@ export default function Dashboard() {
           <div className="absolute right-0 top-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-3xl transform translate-x-10 -translate-y-10"></div>
         </div>
 
-        {/* CONFIGURACIÓN CICLO */}
-        <div className="bg-gray-50 p-5 rounded-2xl mt-auto border border-gray-100">
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">TU CICLO</p>
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar size={16} className="text-gray-500"/>
-            <span className="text-base font-bold capitalize text-gray-700">{config.frequency}</span>
+        {/* FOOTER DEL SIDEBAR */}
+        <div className="mt-auto space-y-3">
+          <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">TU CICLO</p>
+            <div className="flex items-center gap-2 mb-2"><Calendar size={16} className="text-gray-500"/><span className="text-base font-bold capitalize text-gray-700">{config.frequency}</span></div>
+            <button onClick={() => setShowConfigModal(true)} className="text-xs text-blue-600 font-bold mt-3 hover:underline flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-full w-fit"><Settings size={14} /> Modificar</button>
           </div>
-          <button onClick={() => setShowConfigModal(true)} className="text-xs text-blue-600 font-bold mt-3 hover:underline flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-full w-fit"><Settings size={14} /> Modificar</button>
+          
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 hover:text-red-600 font-bold p-3 rounded-xl transition-all text-sm">
+             <LogOut size={18} />
+             Cerrar Sesión
+          </button>
         </div>
+
       </aside>
 
       {/* MAIN */}
       <main className="flex-1 p-6 lg:p-10 overflow-y-auto">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
-          <div><h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Tu Dashboard</h1></div>
+          <div className="flex items-center gap-4">
+             <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Tu Dashboard</h1>
+             <button onClick={handleLogout} className="md:hidden bg-red-50 text-red-500 p-2 rounded-lg"><LogOut size={20}/></button>
+          </div>
+          
           <div className="flex items-center gap-2 self-center md:self-auto">
             <button onClick={() => changePeriod(-1)} className="p-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 shadow-sm"><ChevronLeft size={22} /></button>
             <div className="bg-white border border-gray-200 rounded-2xl shadow-sm px-6 py-2 min-w-[240px] flex flex-col items-center relative">
                <span className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">ESTAS VIENDO</span>
                <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-900 leading-none capitalize">{period.label}</span></div>
-               <select className="absolute inset-0 opacity-0 cursor-pointer" value={viewDate.getMonth()} onChange={(e) => jumpToDate(Number(e.target.value), viewDate.getFullYear())}>
-                 {Array.from({length: 12}).map((_, i) => (<option key={i} value={i}>{new Date(2025, i, 1).toLocaleString('es-ES', { month: 'long' })}</option>))}
-               </select>
+               <select className="absolute inset-0 opacity-0 cursor-pointer" value={viewDate.getMonth()} onChange={(e) => jumpToDate(Number(e.target.value), viewDate.getFullYear())}>{Array.from({length: 12}).map((_, i) => (<option key={i} value={i}>{new Date(2025, i, 1).toLocaleString('es-ES', { month: 'long' })}</option>))}</select>
             </div>
             <button onClick={() => changePeriod(1)} className="p-3 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-600 shadow-sm"><ChevronRight size={22} /></button>
           </div>
         </header>
 
-        {/* 1. TARJETAS */}
-        <StatsCards 
-          totalIncome={totalIncome} 
-          gastosDelMes={gastosDelMes} 
-          gastosDeAhorros={gastosDeAhorros} 
-          saldoDelMes={saldoDelMes}
-          incomes={incomes}
-          onOpenIncomeModal={() => setShowIncomeModal(true)}
-        />
-
-        {/* 2. INPUT DE CARGA */}
+        <StatsCards totalIncome={totalIncome} gastosDelMes={gastosDelMes} gastosDeAhorros={gastosDeAhorros} saldoDelMes={saldoDelMes} incomes={incomes} onOpenIncomeModal={() => setShowIncomeModal(true)} />
         <TransactionInput onAdd={handleAddTransaction} />
-
-        {/* 3. GRÁFICOS */}
         <ChartsSection transactions={filteredTransactions} />
-
-        {/* 4. LISTA */}
-        <TransactionList 
-            transactions={filteredTransactions} 
-            onEdit={(tx) => setEditingTransaction(tx)} 
-            onDelete={handleDeleteTransaction}
-        />
-
+        <TransactionList transactions={filteredTransactions} onEdit={(tx) => setEditingTransaction(tx)} onDelete={handleDeleteTransaction} />
       </main>
     </div>
   );

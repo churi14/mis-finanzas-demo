@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar"; // <--- IMPORTAR ESTO
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Mi App Financiera",
-  description: "Gestión inteligente de gastos",
+  title: "EnQuéGasto",
+  description: "Control de finanzas personales",
 };
 
 export default function RootLayout({
@@ -18,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <Navbar /> {/* <--- AGREGAR ESTO AQUÍ */}
+        {/* ACÁ NO DEBE HABER NINGÚN NAV NI HEADER, SOLO CHILDREN */}
         {children}
       </body>
     </html>
