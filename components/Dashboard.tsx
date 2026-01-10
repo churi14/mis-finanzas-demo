@@ -13,6 +13,7 @@ import TransactionList from './dashboard/TransactionList';
 import ChartsSection from './dashboard/ChartsSection';
 import EditTransactionModal from './dashboard/EditTransactionModal';
 import AddSavingsModal from './dashboard/AddSavingsModal';
+import MonthlyComparison from './dashboard/MonthlyComparison';
 
 // UTILS
 const formatMoney = (val: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(val);
@@ -178,6 +179,7 @@ export default function Dashboard() {
   };
   const jumpToDate = (m: number, y: number) => setViewDate(new Date(y, m, config.startDay));
 
+  // --- GASTOS (Transactions) ---
   const handleAddTransaction = async (newTxData: any) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return alert("Iniciá sesión para guardar.");
@@ -190,13 +192,28 @@ export default function Dashboard() {
       const amount = Number(newTxData.amount);
       const isCredit = newTxData.isCredit;
       const installments = Number(newTxData.installments);
+      
       const finalAmount = isCredit ? (amount / installments) : amount;
       const isInstallment = isCredit && installments > 1;
-      const installmentData = isInstallment ? { totalAmount: amount, count: installments, bank: newTxData.bank || 'Banco', brand: newTxData.brand } : null;
+
+      // LÓGICA DE DATOS EXTRA
+      const installmentData = {
+          totalAmount: amount,
+          count: isInstallment ? installments : 1, 
+          bank: newTxData.bank || 'Efectivo',
+          brand: newTxData.brand,
+          refund: Number(newTxData.refund) || 0 
+      };
 
       const { data, error } = await supabase.from('transactions').insert({
-        user_id: user.id, description: newTxData.desc, amount: finalAmount, date: txDate.toISOString(),
-        source: isCredit ? 'mes' : newTxData.source, category_id: newTxData.categoryId, is_installment: isInstallment, installment_data: installmentData
+        user_id: user.id, 
+        description: newTxData.desc, 
+        amount: finalAmount, 
+        date: txDate.toISOString(),
+        source: newTxData.source, 
+        category_id: newTxData.categoryId, 
+        is_installment: isInstallment, 
+        installment_data: installmentData 
       }).select().single();
 
       if (error) alert("Error: " + error.message);
@@ -319,7 +336,7 @@ export default function Dashboard() {
           EnQuéGasto
         </div>
 
-        {/* PERFIL DE USUARIO (SOLO DESKTOP) */}
+        {/* PERFIL DE USUARIO */}
         {userProfile.name && (
           <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3">
              {userProfile.avatar ? (
@@ -393,9 +410,22 @@ export default function Dashboard() {
         </header>
 
         <StatsCards totalIncome={totalIncome} gastosDelMes={gastosDelMes} gastosDeAhorros={gastosDeAhorros} saldoDelMes={saldoDelMes} incomes={incomes} onOpenIncomeModal={() => setShowIncomeModal(true)} />
+        
         <TransactionInput onAdd={handleAddTransaction} />
+
+        {/* 1. GRÁFICOS DE TORTA (Antes) */}
         <ChartsSection transactions={filteredTransactions} />
-        <TransactionList transactions={filteredTransactions} onEdit={(tx) => setEditingTransaction(tx)} onDelete={handleDeleteTransaction} />
+        
+        {/* 2. LISTA DE MOVIMIENTOS (Antes) */}
+        <TransactionList 
+            transactions={filteredTransactions} 
+            onEdit={(tx) => setEditingTransaction(tx)} 
+            onDelete={handleDeleteTransaction} 
+        />
+
+        {/* 3. GRÁFICO EVOLUCIÓN (AHORA AL FINAL DE TODO) */}
+        <MonthlyComparison transactions={dbTransactions} />
+
       </main>
     </div>
   );

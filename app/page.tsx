@@ -7,26 +7,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 flex flex-col">
       
-      {/* --- NAVBAR --- */}
-      <nav className="border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
-          <div className="flex items-center gap-2 text-xl font-black tracking-tight">
-            <div className="bg-black text-white p-1.5 rounded-lg"><Wallet size={20} /></div> 
-            EnQuéGasto
-          </div>
-          <div className="flex gap-4">
-            {/* ANTES DECÍA href="/dashboard" -> CAMBIAR A "/login" */}
-            <Link href="/login" className="text-sm font-bold text-slate-500 hover:text-black py-2.5 px-4 transition-colors">
-              Iniciar Sesión
-            </Link>
-            
-            <Link href="/dashboard" className="bg-black text-white text-sm font-bold py-2.5 px-6 rounded-full hover:bg-gray-800 transition-all shadow-lg shadow-gray-200">
-              Empezar sin registro
-            </Link>
-          </div>
-        </div>
-      </nav>
-
+     
       {/* --- HERO SECTION --- */}
       <section className="pt-20 pb-32 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">

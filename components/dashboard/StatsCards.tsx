@@ -57,7 +57,7 @@ export default function StatsCards({
           <div className="flex items-center gap-3">
             <div className="p-3 bg-red-50 rounded-2xl text-red-600"><ArrowRight size={28} className="rotate-[-45deg]" /></div>
             <div>
-              <p className="text-xs font-black text-gray-400 uppercase tracking-wide">SALIDAS</p>
+              <p className="text-xs font-black text-gray-400 uppercase tracking-wide">GASTOS DEL MES</p>
               <p className="text-sm font-bold text-gray-800 leading-none">YA GASTASTE</p>
             </div>
           </div>
