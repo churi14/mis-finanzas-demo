@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; 
-import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut, User, Edit2 } from 'lucide-react'; // <--- AGREGUÉ Edit2
+import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut, User, Edit2 } from 'lucide-react';
 import { Transaction, IncomeSource } from '@/types/dashboard';
 import { supabase } from '@/lib/supabase';
 
@@ -14,7 +14,7 @@ import ChartsSection from './dashboard/ChartsSection';
 import EditTransactionModal from './dashboard/EditTransactionModal';
 import AddSavingsModal from './dashboard/AddSavingsModal';
 import MonthlyComparison from './dashboard/MonthlyComparison';
-import EditProfileModal from './dashboard/EditProfileModal'; // <--- IMPORTANTE: NUEVO MODAL
+import EditProfileModal from './dashboard/EditProfileModal';
 
 // UTILS
 const formatMoney = (val: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(val);
@@ -37,7 +37,7 @@ export default function Dashboard() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [showSavingsModal, setShowSavingsModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false); // <--- NUEVO ESTADO
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // DATOS
@@ -67,7 +67,6 @@ export default function Dashboard() {
     // EXTRAER DATOS DE PERFIL
     const { user_metadata, email } = session.user;
     if (user_metadata) {
-        // Priorizamos los datos guardados manualmente, si no existen, usamos los de Google
         setUserProfile({
             name: user_metadata.full_name || user_metadata.name || 'Usuario',
             avatar: user_metadata.avatar_url || user_metadata.picture || '',
@@ -105,7 +104,6 @@ export default function Dashboard() {
 
   // --- ACTUALIZAR PERFIL ---
   const handleUpdateProfile = async (newName: string, newAvatar: string) => {
-     // 1. Actualizar en Supabase (Metadatos del usuario)
      const { error } = await supabase.auth.updateUser({
         data: { full_name: newName, avatar_url: newAvatar }
      });
@@ -113,7 +111,6 @@ export default function Dashboard() {
      if (error) {
         alert("Error al actualizar perfil: " + error.message);
      } else {
-        // 2. Actualizar estado local para que se vea rápido
         setUserProfile(prev => ({ ...prev, name: newName, avatar: newAvatar }));
         setShowProfileModal(false);
      }
@@ -121,7 +118,7 @@ export default function Dashboard() {
 
   // --- LOGOUT ---
   const handleLogout = async (e: React.MouseEvent) => {
-      e.stopPropagation(); // Evita que se abra el modal de perfil al hacer click en salir
+      e.stopPropagation(); 
       await supabase.auth.signOut();
       router.push('/login'); 
   };
@@ -335,18 +332,30 @@ export default function Dashboard() {
 
       {editingTransaction && <EditTransactionModal transaction={editingTransaction} onClose={() => setEditingTransaction(null)} onSave={handleUpdateTransaction} />}
 
-      {/* MODAL INGRESOS */}
+      {/* MODAL INGRESOS (CORREGIDO PARA MOBILE) */}
       {showIncomeModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
                 <div className="bg-black text-white p-5 flex justify-between items-center"><div><h3 className="font-bold text-xl flex items-center gap-2">Mis Ingresos</h3></div><button onClick={() => setShowIncomeModal(false)} className="hover:text-gray-300"><X size={20}/></button></div>
                 <div className="p-6">
                     <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 mb-6">
-                        <div className="flex gap-2 mb-2">
-                            <input className="flex-1 p-3 rounded-xl border border-blue-200 text-sm outline-none" placeholder="Descripción" value={newIncome.desc} onChange={(e)=>setNewIncome({...newIncome, desc:e.target.value})}/>
-                            <input className="w-32 p-3 rounded-xl border border-blue-200 text-sm outline-none font-bold" type="number" placeholder="$" value={newIncome.amount} onChange={(e)=>setNewIncome({...newIncome, amount:e.target.value})}/>
+                        {/* AQUI ESTA LA CORRECCION RESPONSIVE */}
+                        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                            <input 
+                                className="w-full sm:flex-1 p-3 rounded-xl border border-blue-200 text-sm outline-none" 
+                                placeholder="Descripción" 
+                                value={newIncome.desc} 
+                                onChange={(e)=>setNewIncome({...newIncome, desc:e.target.value})}
+                            />
+                            <input 
+                                className="w-full sm:w-32 p-3 rounded-xl border border-blue-200 text-sm outline-none font-bold" 
+                                type="number" 
+                                placeholder="$" 
+                                value={newIncome.amount} 
+                                onChange={(e)=>setNewIncome({...newIncome, amount:e.target.value})}
+                            />
                         </div>
-                        <button onClick={addIncome} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-bold">Confirmar</button>
+                        <button onClick={addIncome} className="w-full bg-blue-600 text-white py-3 rounded-xl text-sm font-bold shadow-md hover:bg-blue-700 transition-colors">Confirmar</button>
                     </div>
                     <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                         {incomes.map(inc => (
@@ -369,7 +378,7 @@ export default function Dashboard() {
         {/* PERFIL DE USUARIO CLICKABLE */}
         {userProfile.name && (
           <div 
-            onClick={() => setShowProfileModal(true)} // <-- AHORA ABRE EL MODAL
+            onClick={() => setShowProfileModal(true)} 
             className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:bg-gray-100 hover:border-gray-200 transition-all"
           >
              <div className="flex items-center gap-3">
@@ -391,7 +400,7 @@ export default function Dashboard() {
 
              <button 
                 onClick={handleLogout} 
-                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all z-10" // z-10 para que este boton tenga prioridad sobre el click del div
+                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all z-10" 
                 title="Cerrar Sesión"
              >
                 <LogOut size={18} />
