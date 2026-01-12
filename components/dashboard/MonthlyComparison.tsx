@@ -99,10 +99,10 @@ export default function MonthlyComparison({ transactions }: MonthlyComparisonPro
                 tick={{ fill: '#94a3b8', fontSize: 12 }} 
                 tickFormatter={(value) => `$${value/1000}k`} 
             />
+            {/* AQUÍ ESTABA EL ERROR: Cambiamos 'number' por 'any' */}
             <Tooltip 
                 cursor={{ fill: '#f8fafc' }}
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                // CORRECCIÓN ACÁ: Usamos "any" y forzamos la conversión a Number para evitar el error
                 formatter={(value: any) => [`$${Number(value).toLocaleString('es-AR')}`, 'Total Gastado']}
             />
             <Bar dataKey="gasto" radius={[6, 6, 0, 0]} barSize={50}>
