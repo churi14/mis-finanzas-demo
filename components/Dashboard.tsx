@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation'; 
-import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Wallet, Settings, Calendar, X, Plus, DollarSign, Clock, Trash2, TrendingUp, Loader2, LogOut, User, Edit2 } from 'lucide-react'; // <--- AGREGUÉ Edit2
 import { Transaction, IncomeSource } from '@/types/dashboard';
 import { supabase } from '@/lib/supabase';
 
@@ -14,6 +14,7 @@ import ChartsSection from './dashboard/ChartsSection';
 import EditTransactionModal from './dashboard/EditTransactionModal';
 import AddSavingsModal from './dashboard/AddSavingsModal';
 import MonthlyComparison from './dashboard/MonthlyComparison';
+import EditProfileModal from './dashboard/EditProfileModal'; // <--- IMPORTANTE: NUEVO MODAL
 
 // UTILS
 const formatMoney = (val: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(val);
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [showSavingsModal, setShowSavingsModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false); // <--- NUEVO ESTADO
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // DATOS
@@ -55,16 +57,17 @@ export default function Dashboard() {
   const fetchEverything = async () => {
     setLoading(true);
     
-    // 1. Verificar sesión y OBTENER PERFIL
+    // 1. Verificar sesión
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
         router.push('/login');
         return;
     }
 
-    // EXTRAER DATOS DE GOOGLE
+    // EXTRAER DATOS DE PERFIL
     const { user_metadata, email } = session.user;
     if (user_metadata) {
+        // Priorizamos los datos guardados manualmente, si no existen, usamos los de Google
         setUserProfile({
             name: user_metadata.full_name || user_metadata.name || 'Usuario',
             avatar: user_metadata.avatar_url || user_metadata.picture || '',
@@ -100,8 +103,25 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  // --- ACTUALIZAR PERFIL ---
+  const handleUpdateProfile = async (newName: string, newAvatar: string) => {
+     // 1. Actualizar en Supabase (Metadatos del usuario)
+     const { error } = await supabase.auth.updateUser({
+        data: { full_name: newName, avatar_url: newAvatar }
+     });
+
+     if (error) {
+        alert("Error al actualizar perfil: " + error.message);
+     } else {
+        // 2. Actualizar estado local para que se vea rápido
+        setUserProfile(prev => ({ ...prev, name: newName, avatar: newAvatar }));
+        setShowProfileModal(false);
+     }
+  };
+
   // --- LOGOUT ---
-  const handleLogout = async () => {
+  const handleLogout = async (e: React.MouseEvent) => {
+      e.stopPropagation(); // Evita que se abra el modal de perfil al hacer click en salir
       await supabase.auth.signOut();
       router.push('/login'); 
   };
@@ -279,6 +299,16 @@ export default function Dashboard() {
       {loading && <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={48} /></div>}
 
       {showSavingsModal && <AddSavingsModal onClose={() => setShowSavingsModal(false)} onAdd={handleAddSavings} />}
+      
+      {/* MODAL PERFIL */}
+      {showProfileModal && (
+        <EditProfileModal 
+            currentName={userProfile.name} 
+            currentAvatar={userProfile.avatar} 
+            onClose={() => setShowProfileModal(false)} 
+            onSave={handleUpdateProfile} 
+        />
+      )}
 
       {/* MODAL CONFIG */}
       {showConfigModal && (
@@ -336,21 +366,40 @@ export default function Dashboard() {
           EnQuéGasto
         </div>
 
-        {/* PERFIL DE USUARIO */}
+        {/* PERFIL DE USUARIO CLICKABLE */}
         {userProfile.name && (
-          <div className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center gap-3">
-             {userProfile.avatar ? (
-                <img src={userProfile.avatar} alt="Perfil" className="w-10 h-10 rounded-full object-cover border border-gray-200" />
-             ) : (
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold"><User size={20}/></div>
-             )}
-             <div className="overflow-hidden">
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">HOLA,</p>
-                <p className="text-sm font-bold text-gray-900 truncate">{userProfile.name.split(' ')[0]}</p>
+          <div 
+            onClick={() => setShowProfileModal(true)} // <-- AHORA ABRE EL MODAL
+            className="mb-8 p-4 bg-gray-50 rounded-2xl border border-gray-100 flex items-center justify-between group cursor-pointer hover:bg-gray-100 hover:border-gray-200 transition-all"
+          >
+             <div className="flex items-center gap-3">
+                 {userProfile.avatar ? (
+                    <img src={userProfile.avatar} alt="Perfil" className="w-10 h-10 rounded-full object-cover border border-gray-200" />
+                 ) : (
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold"><User size={20}/></div>
+                 )}
+                 <div className="overflow-hidden">
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">HOLA,</p>
+                    <p className="text-sm font-bold text-gray-900 truncate max-w-[90px]">{userProfile.name.split(' ')[0]}</p>
+                 </div>
              </div>
+             
+             {/* Icono de edición que aparece al pasar el mouse */}
+             <div className="hidden group-hover:flex text-gray-400 mr-2">
+                <Edit2 size={16} />
+             </div>
+
+             <button 
+                onClick={handleLogout} 
+                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all z-10" // z-10 para que este boton tenga prioridad sobre el click del div
+                title="Cerrar Sesión"
+             >
+                <LogOut size={18} />
+             </button>
           </div>
         )}
 
+        {/* TARJETA MIS AHORROS */}
         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl mb-6 shadow-xl relative overflow-hidden border border-slate-700">
           <div className="relative z-10">
             <div className="flex justify-between items-start mb-3">
@@ -367,18 +416,11 @@ export default function Dashboard() {
           <div className="absolute right-0 top-0 w-32 h-32 bg-yellow-500 opacity-10 rounded-full blur-3xl transform translate-x-10 -translate-y-10"></div>
         </div>
 
-        {/* FOOTER DEL SIDEBAR */}
-        <div className="mt-auto space-y-3">
-          <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">TU CICLO</p>
-            <div className="flex items-center gap-2 mb-2"><Calendar size={16} className="text-gray-500"/><span className="text-base font-bold capitalize text-gray-700">{config.frequency}</span></div>
-            <button onClick={() => setShowConfigModal(true)} className="text-xs text-blue-600 font-bold mt-3 hover:underline flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-full w-fit"><Settings size={14} /> Modificar</button>
-          </div>
-          
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 hover:text-red-600 font-bold p-3 rounded-xl transition-all text-sm">
-             <LogOut size={18} />
-             Cerrar Sesión
-          </button>
+        {/* TARJETA CONFIGURACIÓN CICLO */}
+        <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100 mb-6">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">TU CICLO</p>
+          <div className="flex items-center gap-2 mb-2"><Calendar size={16} className="text-gray-500"/><span className="text-base font-bold capitalize text-gray-700">{config.frequency}</span></div>
+          <button onClick={() => setShowConfigModal(true)} className="text-xs text-blue-600 font-bold mt-3 hover:underline flex items-center gap-1 bg-blue-50 px-4 py-2 rounded-full w-fit"><Settings size={14} /> Modificar</button>
         </div>
 
       </aside>
@@ -392,7 +434,7 @@ export default function Dashboard() {
              {/* PERFIL Y LOGOUT MÓVIL */}
              <div className="flex items-center gap-3 md:hidden">
                 {userProfile.avatar && (
-                    <img src={userProfile.avatar} alt="Perfil" className="w-9 h-9 rounded-full border border-gray-200" />
+                    <img onClick={() => setShowProfileModal(true)} src={userProfile.avatar} alt="Perfil" className="w-9 h-9 rounded-full border border-gray-200 cursor-pointer" />
                 )}
                 <button onClick={handleLogout} className="bg-red-50 text-red-500 p-2 rounded-lg"><LogOut size={20}/></button>
              </div>
@@ -413,17 +455,11 @@ export default function Dashboard() {
         
         <TransactionInput onAdd={handleAddTransaction} />
 
-        {/* 1. GRÁFICOS DE TORTA (Antes) */}
         <ChartsSection transactions={filteredTransactions} />
         
-        {/* 2. LISTA DE MOVIMIENTOS (Antes) */}
-        <TransactionList 
-            transactions={filteredTransactions} 
-            onEdit={(tx) => setEditingTransaction(tx)} 
-            onDelete={handleDeleteTransaction} 
-        />
+        <TransactionList transactions={filteredTransactions} onEdit={(tx) => setEditingTransaction(tx)} onDelete={handleDeleteTransaction} />
 
-        {/* 3. GRÁFICO EVOLUCIÓN (AHORA AL FINAL DE TODO) */}
+        {/* Gráfico de Evolución al final */}
         <MonthlyComparison transactions={dbTransactions} />
 
       </main>
