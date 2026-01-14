@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
@@ -42,7 +41,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900 flex flex-col">
-      <Navbar />
+      {/* Navbar borrado para evitar duplicados */}
 
       <main className="flex-grow">
         {/* Encabezado */}

@@ -1,36 +1,51 @@
 import Link from 'next/link';
 import { Wallet } from 'lucide-react';
-import { ThemeToggle } from './ThemeToggle'; // <--- Importamos el botón nuevo
 
 export default function Navbar() {
   return (
-    // Agregamos dark:bg-slate-900/80 y dark:border-slate-800 para que la barra se oscurezca
-    <nav className="border-b border-gray-100 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-50 w-full transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex justify-between items-center">
+    <nav className="fixed w-full z-50 top-0 start-0 border-b border-gray-800 bg-slate-900">
+      <div className="max-w-screen-xl flex flex-wrap items-center justify-between mx-auto p-4">
         
         {/* LOGO */}
-        <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-tight hover:opacity-80 transition-opacity text-slate-900 dark:text-white">
-          <div className="bg-black dark:bg-white text-white dark:text-black p-1.5 rounded-lg transition-colors">
-            <Wallet size={20} />
-          </div> 
-          EnQuéGasto
+        <Link href="/" className="flex items-center space-x-2 rtl:space-x-reverse">
+            <div className="bg-white text-slate-900 p-1.5 rounded-lg">
+                <Wallet size={24} />
+            </div>
+            <span className="self-center text-xl font-black whitespace-nowrap text-white tracking-tight">EnQuéGasto</span>
         </Link>
-
-        {/* LINKS (Escritorio) */}
-        <div className="hidden md:flex gap-8 text-sm font-bold text-slate-500 dark:text-slate-400">
-          <Link href="/" className="hover:text-black dark:hover:text-white transition-colors">Inicio</Link>
-          <Link href="/faq" className="hover:text-black dark:hover:text-white transition-colors">FAQ</Link>
-          <Link href="/about" className="hover:text-black dark:hover:text-white transition-colors">Nosotros</Link>
+        
+        {/* BOTÓN MENÚ MÓVIL (Hamburguesa) */}
+        <div className="flex md:hidden">
+            <button data-collapse-toggle="navbar-sticky" type="button" className="inline-flex items-center p-2 w-10 h-10 justify-center text-sm text-gray-400 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-600">
+                <span className="sr-only">Abrir menú</span>
+                <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 17 14">
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1h15M1 7h15M1 13h15"/>
+                </svg>
+            </button>
         </div>
 
-        {/* BOTONES (Acá va el Toggle) */}
-        <div className="flex gap-3 items-center">
-          <ThemeToggle /> {/* <--- EL BOTÓN DE SOL/LUNA */}
-          
-          <Link href="/dashboard" className="bg-black text-white dark:bg-white dark:text-black text-sm font-bold py-2.5 px-6 rounded-full hover:bg-gray-800 dark:hover:bg-gray-200 transition-all shadow-lg shadow-gray-200 dark:shadow-none">
-            Dashboard
-          </Link>
+        {/* LINKS DE NAVEGACIÓN */}
+        <div className="items-center justify-between hidden w-full md:flex md:w-auto md:order-1" id="navbar-sticky">
+          <ul className="flex flex-col p-4 md:p-0 mt-4 font-bold border border-gray-700 rounded-lg bg-slate-800 md:space-x-8 rtl:space-x-reverse md:flex-row md:mt-0 md:border-0 md:bg-transparent">
+            <li>
+              <Link href="/" className="block py-2 px-3 text-white rounded hover:bg-gray-700 md:hover:bg-transparent md:hover:text-blue-400 md:p-0 transition-colors">
+                Inicio
+              </Link>
+            </li>
+            <li>
+              <Link href="/faq" className="block py-2 px-3 text-white rounded hover:bg-gray-700 md:hover:bg-transparent md:hover:text-blue-400 md:p-0 transition-colors">
+                FAQ
+              </Link>
+            </li>
+            <li>
+              <Link href="/about" className="block py-2 px-3 text-white rounded hover:bg-gray-700 md:hover:bg-transparent md:hover:text-blue-400 md:p-0 transition-colors">
+                Nosotros
+              </Link>
+            </li>
+          </ul>
         </div>
+
+        {/* (ACÁ ESTABA EL DASHBOARD Y LA LUNA, YA LOS BORRÉ) */}
 
       </div>
     </nav>

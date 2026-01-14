@@ -14,9 +14,7 @@ export default function Home() {
           
           {/* Texto Hero */}
           <div className="space-y-8 animate-fade-in-up">
-            <div className="inline-block bg-blue-50 text-blue-700 text-xs font-bold px-3 py-1 rounded-full border border-blue-100">
-              🚀 Nueva versión 2.0 disponible
-            </div>
+           
             <h1 className="text-5xl md:text-7xl font-black tracking-tight leading-[1.1]">
               ¿Sabés realmente <br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600">
