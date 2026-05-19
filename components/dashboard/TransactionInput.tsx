@@ -293,7 +293,14 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
                   </div>
                   {refundType === 'percentage' && (
                     <div className="md:col-span-6">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Tope máximo (opcional)</label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tope máximo (opcional)</label>
+                        {monto > 0 && refundInputVal > 0 && (
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            sin tope: <span className="text-green-600">-${((monto * refundInputVal) / 100).toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="relative">
                         <input type="number" placeholder="Ej: 5000"
                           className="w-full bg-white border border-slate-200 text-slate-600 font-bold rounded-xl px-4 pl-9 outline-none focus:ring-2 focus:ring-slate-200 h-[44px]"

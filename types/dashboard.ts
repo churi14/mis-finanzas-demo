@@ -16,8 +16,6 @@ export interface Transaction {
   amount: number;
   source: string; 
   categoryId: string;
-  bank?: string;
-  brand?: string;
   isInstallment?: boolean;
   installmentData?: InstallmentData;
   currentInstallment?: number; 
