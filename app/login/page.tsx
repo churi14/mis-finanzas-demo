@@ -166,7 +166,6 @@ export default function LoginPage() {
             <p className="text-lg text-slate-500 max-w-md">La plataforma más simple para organizar tus gastos en Argentina.</p>
         </div>
       </div>
-    </div>
 
       {/* TOAST */}
       {toast && (
