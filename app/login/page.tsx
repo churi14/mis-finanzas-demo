@@ -88,7 +88,7 @@ export default function LoginPage() {
             <button 
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full bg-white border-2 border-slate-100 text-slate-700 font-bold py-3.5 rounded-xl hover:bg-slate-50 transition-all flex items-center justify-center gap-3"
+                className="w-full bg-white border border-slate-200 text-slate-700 font-bold py-3.5 rounded-xl hover:bg-slate-50 hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-3 [box-shadow:0_4px_20px_rgba(0,0,0,0.08)] hover:[box-shadow:0_8px_30px_rgba(0,0,0,0.15)]"
             >
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                 <span>Continuar con Google</span>
