@@ -128,7 +128,7 @@ export default function LoginPage() {
                 <button 
                   type="submit" 
                   disabled={loading}
-                  className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-lg flex items-center justify-center gap-2"
+                  className="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-[0_8px_30px_rgba(0,0,0,0.3)] hover:shadow-[0_12px_40px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 flex items-center justify-center gap-2"
                 >
                   {loading && <Loader2 className="animate-spin" size={20} />}
                   {isSignUp ? 'Registrarme' : 'Ingresar'}
