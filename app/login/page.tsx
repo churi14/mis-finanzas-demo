@@ -8,6 +8,12 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [toast, setToast] = useState<{msg: string, type: 'ok' | 'error'} | null>(null);
+
+  const showToast = (msg: string, type: 'ok' | 'error') => {
+    setToast({msg, type});
+    setTimeout(() => setToast(null), 4000);
+  };
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +30,7 @@ export default function LoginPage() {
         redirectTo: `${location.origin}/dashboard`,
       },
     });
-    if (error) alert(error.message);
+    if (error) showToast(error.message, 'error');
     setLoading(false);
   };
 
@@ -40,9 +46,9 @@ export default function LoginPage() {
         password,
       });
       if (error) {
-        alert('Error al registrarse: ' + error.message);
+        showToast('Error al registrarse: ' + error.message, 'error');
       } else {
-        alert('¡Registro exitoso! Ya podés iniciar sesión.');
+        showToast('¡Registro exitoso! Revisá tu mail para confirmar tu cuenta.', 'ok');
         setIsSignUp(false); // Lo mandamos al login
       }
     } else {
@@ -52,7 +58,7 @@ export default function LoginPage() {
         password,
       });
       if (error) {
-        alert('Error al ingresar: ' + error.message);
+        showToast('Error al ingresar: ' + error.message, 'error');
       } else {
         router.push('/dashboard'); // Si sale bien, lo mandamos al dashboard
       }
@@ -96,7 +102,7 @@ export default function LoginPage() {
             
             <div className="relative flex py-2 items-center">
                 <div className="flex-grow border-t border-slate-100"></div>
-                <span className="flex-shrink-0 mx-4 text-slate-300 text-xs uppercase font-bold">O con tu email</span>
+                <span className="flex-shrink-0 mx-4 text-slate-300 text-xs uppercase font-bold">O si preferís, usá tu email</span>
                 <div className="flex-grow border-t border-slate-100"></div>
             </div>
 
@@ -105,7 +111,7 @@ export default function LoginPage() {
                 <div className="relative">
                     <input 
                       type="email" 
-                      placeholder="tu@email.com" 
+                      placeholder="Tu email (ej: juan@gmail.com)" 
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -116,7 +122,7 @@ export default function LoginPage() {
                 <div className="relative">
                     <input 
                       type="password" 
-                      placeholder="Contraseña" 
+                      placeholder="Elegí una contraseña segura" 
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -160,6 +166,15 @@ export default function LoginPage() {
             <p className="text-lg text-slate-500 max-w-md">La plataforma más simple para organizar tus gastos en Argentina.</p>
         </div>
       </div>
+    </div>
+
+      {/* TOAST */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-300 ${toast.type === 'ok' ? 'bg-emerald-500' : 'bg-red-500'} text-white font-bold text-sm`}>
+          <span>{toast.type === 'ok' ? '✅' : '❌'}</span>
+          {toast.msg}
+        </div>
+      )}
     </div>
   );
 }
