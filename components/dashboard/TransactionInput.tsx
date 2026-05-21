@@ -101,9 +101,14 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
         <div className="space-y-3">
           <button
             onClick={() => setShowChat(!showChat)}
-            className="w-full bg-slate-900 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm hover:bg-slate-700 transition-colors"
+            className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-3 hover:from-slate-700 hover:to-slate-800 transition-all shadow-lg border border-slate-700"
           >
-            🪙 Modo fácil — Decile a Monedita
+            <span className="text-2xl">🪙</span>
+            <div className="text-left">
+              <p className="text-sm font-black">Modo fácil</p>
+              <p className="text-xs text-slate-400 font-medium">Escribí en lenguaje natural</p>
+            </div>
+            <span className="ml-auto text-slate-400 text-xs bg-slate-700 px-2 py-1 rounded-lg">NUEVO</span>
           </button>
         <div className="relative group w-full">
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-2xl blur-lg opacity-70 group-hover:opacity-100 transition duration-200 animate-pulse" />
