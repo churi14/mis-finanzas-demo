@@ -18,47 +18,66 @@ interface ParsedTx {
   amount: number;
   categoryId: string;
   categoryEmoji: string;
-  source: string;
 }
 
-const CATEGORY_MAP: Record<string, { id: string; emoji: string }> = {
-  comida:        { id: "comida",       emoji: "🍕" },
-  delivery:      { id: "comida",       emoji: "🛵" },
-  restaurante:   { id: "comida",       emoji: "🍽️" },
-  supermercado:  { id: "supermercado", emoji: "🛒" },
-  mercado:       { id: "supermercado", emoji: "🛒" },
-  almacen:       { id: "supermercado", emoji: "🛒" },
-  servicios:     { id: "servicios",    emoji: "💡" },
-  luz:           { id: "servicios",    emoji: "💡" },
-  gas:           { id: "servicios",    emoji: "🔥" },
-  internet:      { id: "servicios",    emoji: "📡" },
-  transporte:    { id: "transporte",   emoji: "🚌" },
-  nafta:         { id: "transporte",   emoji: "⛽" },
-  sube:          { id: "transporte",   emoji: "🚌" },
-  uber:          { id: "transporte",   emoji: "🚗" },
-  salud:         { id: "salud",        emoji: "💊" },
-  farmacia:      { id: "salud",        emoji: "💊" },
-  medico:        { id: "salud",        emoji: "🏥" },
-  educacion:     { id: "educacion",    emoji: "📚" },
-  curso:         { id: "educacion",    emoji: "🎓" },
-  ocio:          { id: "ocio",         emoji: "🎉" },
-  netflix:       { id: "ocio",         emoji: "🍿" },
-  spotify:       { id: "ocio",         emoji: "🎵" },
-  cine:          { id: "ocio",         emoji: "🎬" },
-  ropa:          { id: "ropa",         emoji: "👕" },
-  zapatillas:    { id: "ropa",         emoji: "👟" },
-  tecnologia:    { id: "tecnologia",   emoji: "💻" },
-  celular:       { id: "tecnologia",   emoji: "📱" },
-  casa:          { id: "casa",         emoji: "🏠" },
-  alquiler:      { id: "casa",         emoji: "🏠" },
-};
+const KEYWORDS: { words: string[]; id: string; emoji: string }[] = [
+  { words: ["delivery","pizza","hamburguesa","sushi","empanada","comida","almuerzo","cena","desayuno","medialunas","cafe","restaurant","resto"], id: "comida", emoji: "🍕" },
+  { words: ["supermercado","mercado","almacen","verduleria","carniceria","compras","super","dia","coto","jumbo","disco","vea"], id: "supermercado", emoji: "🛒" },
+  { words: ["luz","gas","agua","internet","telefono","celular","movistar","personal","claro","servicio","expensa"], id: "servicios", emoji: "💡" },
+  { words: ["nafta","sube","colectivo","taxi","uber","cabify","remis","peaje","estacionamiento","tren","subte","combustible"], id: "transporte", emoji: "🚌" },
+  { words: ["farmacia","medico","doctor","clinica","hospital","medicamento","remedio","turno","salud","dentista"], id: "salud", emoji: "💊" },
+  { words: ["curso","libro","universidad","facultad","colegio","estudio","educacion","capacitacion","ingles"], id: "educacion", emoji: "📚" },
+  { words: ["netflix","spotify","hbo","disney","prime","cine","teatro","bar","boliche","salida","trago","cerveza","vino","fiesta","ocio","juego","videojuego"], id: "ocio", emoji: "🎉" },
+  { words: ["ropa","zapatilla","camisa","pantalon","remera","vestido","buzo","campera","calzado","indumentaria"], id: "ropa", emoji: "👕" },
+  { words: ["celular","notebook","computadora","tablet","auricular","electronico","tecnologia","cargador","cable"], id: "tecnologia", emoji: "💻" },
+  { words: ["alquiler","expensas","casa","depto","mueble","ferreteria","plomero","electricista","pintura"], id: "casa", emoji: "🏠" },
+];
+
+const AMOUNT_REGEX = /\$?\s?(\d[\d.,]*)/;
+
+function detectCategory(text: string): { id: string; emoji: string } {
+  const lower = text.toLowerCase();
+  for (const cat of KEYWORDS) {
+    if (cat.words.some(w => lower.includes(w))) {
+      return { id: cat.id, emoji: cat.emoji };
+    }
+  }
+  return { id: "varios", emoji: "📦" };
+}
+
+function extractAmount(text: string): number | null {
+  const match = text.match(AMOUNT_REGEX);
+  if (!match) return null;
+  const clean = match[1].replace(/\./g, "").replace(",", ".");
+  const num = parseFloat(clean);
+  return isNaN(num) ? null : num;
+}
+
+function extractDesc(text: string): string {
+  // Sacar palabras de cantidad para quedarnos con la descripción
+  const cleaned = text
+    .replace(/gasté|gaste|pague|pagué|compré|compre|me costó|me costo/gi, "")
+    .replace(/\$?\s?\d[\d.,]*/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1) || "Gasto";
+}
+
+function parse(text: string): ParsedTx | null {
+  const amount = extractAmount(text);
+  if (!amount) return null;
+  const cat = detectCategory(text);
+  const desc = extractDesc(text);
+  return { desc, amount, categoryId: cat.id, categoryEmoji: cat.emoji };
+}
+
+const fmt = (n: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(n);
 
 export default function MonaditaChat({ onAdd, onClose }: Props) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "monedita", text: "¡Hola! Contame en qué gastaste y yo me encargo del resto 😄" }
   ]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
   const [pendingTx, setPendingTx] = useState<ParsedTx | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -66,69 +85,27 @@ export default function MonaditaChat({ onAdd, onClose }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const callClaude = async (userText: string): Promise<ParsedTx> => {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 200,
-        messages: [{
-          role: "user",
-          content: `Sos un asistente financiero argentino. El usuario escribió: "${userText}"
-          
-Extraé la información del gasto y respondé SOLO con JSON válido, sin texto extra:
-{
-  "desc": "descripción corta del gasto",
-  "amount": número positivo en pesos argentinos,
-  "categoryId": una de estas categorías exactas: comida, supermercado, servicios, transporte, salud, educacion, ocio, ropa, tecnologia, casa, varios,
-  "categoryEmoji": emoji que represente la categoría,
-  "source": "mes"
-}
-
-Si no podés interpretar el gasto, devolvé: {"error": "no entendí"}
-Importante: el monto siempre es positivo. Si dice "gasté 35000" el amount es 35000.`
-        }],
-      })
-    });
-
-    const data = await response.json();
-    const text = data.content?.[0]?.text || "";
-    const clean = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(clean);
-  };
-
-  const handleSend = async () => {
-    if (!input.trim() || loading) return;
+  const handleSend = () => {
+    if (!input.trim()) return;
     const userMsg = input.trim();
     setInput("");
     setMessages(prev => [...prev, { role: "user", text: userMsg }]);
-    setLoading(true);
 
-    try {
-      const parsed = await callClaude(userMsg);
-
-      if ((parsed as any).error) {
-        setMessages(prev => [...prev, {
-          role: "monedita",
-          text: "No pude entender el gasto 😅 ¿Lo podés escribir de otra forma? Ej: 'gasté 5000 en nafta'"
-        }]);
-      } else {
-        setPendingTx(parsed);
-        setMessages(prev => [...prev, {
-          role: "monedita",
-          text: `Entendido ${parsed.categoryEmoji} ¿Lo anoto como:`,
-          parsed
-        }]);
-      }
-    } catch {
+    const parsed = parse(userMsg);
+    if (!parsed) {
       setMessages(prev => [...prev, {
         role: "monedita",
-        text: "Tuve un problema procesando eso. Intentá de nuevo 🙏"
+        text: "No encontré el monto 😅 Escribí algo como: 'gasté 5000 en delivery'"
       }]);
+      return;
     }
 
-    setLoading(false);
+    setPendingTx(parsed);
+    setMessages(prev => [...prev, {
+      role: "monedita",
+      text: `Entendido ${parsed.categoryEmoji} ¿Lo anoto como:`,
+      parsed
+    }]);
   };
 
   const handleConfirm = () => {
@@ -147,7 +124,7 @@ Importante: el monto siempre es positivo. Si dice "gasté 35000" el amount es 35
     setPendingTx(null);
     setMessages(prev => [...prev, {
       role: "monedita",
-      text: `✅ ¡Listo! Gasto registrado en ${pendingTx.categoryId}. ¿Querés anotar otro?`
+      text: `✅ ¡Listo! Registrado en ${pendingTx.categoryId}. ¿Querés anotar otro?`
     }]);
   };
 
@@ -155,14 +132,12 @@ Importante: el monto siempre es positivo. Si dice "gasté 35000" el amount es 35
     setPendingTx(null);
     setMessages(prev => [...prev, {
       role: "monedita",
-      text: "Cancelado. ¿Lo querés anotar diferente?"
+      text: "Cancelado. ¿Lo querés escribir de otra forma?"
     }]);
   };
 
   return (
     <div className="bg-slate-900 rounded-3xl overflow-hidden border border-slate-700 mb-6 shadow-2xl">
-
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
         <div className="flex items-center gap-3">
           <span className="text-2xl">🪙</span>
@@ -174,65 +149,30 @@ Importante: el monto siempre es positivo. Si dice "gasté 35000" el amount es 35
         <button onClick={onClose} className="text-slate-400 hover:text-white text-xl font-bold transition-colors">✕</button>
       </div>
 
-      {/* Mensajes */}
-      <div className="h-64 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="h-56 overflow-y-auto px-4 py-4 space-y-3">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} gap-2`}>
             {msg.role === "monedita" && <span className="text-xl flex-shrink-0 mt-1">🪙</span>}
-            <div className={`max-w-[80%] space-y-2`}>
-              <div className={`px-4 py-3 rounded-2xl text-sm font-medium ${
-                msg.role === "user"
-                  ? "bg-white text-slate-900 rounded-tr-sm"
-                  : "bg-slate-700 text-white rounded-tl-sm"
-              }`}>
+            <div className="max-w-[80%] space-y-2">
+              <div className={`px-4 py-3 rounded-2xl text-sm font-medium ${msg.role === "user" ? "bg-white text-slate-900 rounded-tr-sm" : "bg-slate-700 text-white rounded-tl-sm"}`}>
                 {msg.text}
               </div>
-
-              {/* Card de confirmación */}
               {msg.parsed && pendingTx && (
                 <div className="bg-slate-800 border border-slate-600 rounded-2xl p-3 space-y-2">
-                  <p className="text-white font-black text-base">
-                    -{new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 }).format(msg.parsed.amount)}
-                  </p>
-                  <p className="text-slate-400 text-xs font-medium">
-                    {msg.parsed.categoryEmoji} {msg.parsed.desc} · {msg.parsed.categoryId}
-                  </p>
+                  <p className="text-white font-black text-base">-{fmt(msg.parsed.amount)}</p>
+                  <p className="text-slate-400 text-xs font-medium">{msg.parsed.categoryEmoji} {msg.parsed.desc} · {msg.parsed.categoryId}</p>
                   <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={handleConfirm}
-                      className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm py-2 rounded-xl transition-colors"
-                    >
-                      Sí, anotalo
-                    </button>
-                    <button
-                      onClick={handleCancel}
-                      className="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold text-sm py-2 rounded-xl transition-colors"
-                    >
-                      Cancelar
-                    </button>
+                    <button onClick={handleConfirm} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white font-black text-sm py-2 rounded-xl transition-colors">Sí, anotalo</button>
+                    <button onClick={handleCancel} className="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold text-sm py-2 rounded-xl transition-colors">Cancelar</button>
                   </div>
                 </div>
               )}
             </div>
           </div>
         ))}
-
-        {loading && (
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🪙</span>
-            <div className="bg-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm">
-              <div className="flex gap-1 items-center h-4">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 py-4 border-t border-slate-700 flex gap-3">
         <input
           type="text"
@@ -241,15 +181,8 @@ Importante: el monto siempre es positivo. Si dice "gasté 35000" el amount es 35
           onKeyDown={e => e.key === "Enter" && handleSend()}
           placeholder="Ej: gasté 35000 en delivery..."
           className="flex-1 bg-slate-800 border border-slate-600 text-white placeholder:text-slate-500 rounded-xl px-4 py-3 text-sm outline-none focus:border-emerald-500 transition-colors font-medium"
-          disabled={loading}
         />
-        <button
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-black px-4 py-3 rounded-xl transition-colors"
-        >
-          ↵
-        </button>
+        <button onClick={handleSend} disabled={!input.trim()} className="bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-white font-black px-4 py-3 rounded-xl transition-colors">↵</button>
       </div>
     </div>
   );
