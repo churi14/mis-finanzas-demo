@@ -211,7 +211,45 @@ export default function Dashboard() {
   const handleUpdateTransaction = (updatedTx: Transaction) => { setDbTransactions(prev => prev.map(tx => (tx.id === updatedTx.id ? updatedTx : tx))); setEditingTransaction(null); };
   const addIncome = async () => { fetchEverything(); setShowIncomeModal(false); };
   const removeIncome = async (id: number) => { fetchEverything(); };
-  const handleAddSavings = async (amount: number) => { fetchEverything(); };
+  const handleAddSavings = async (amount: number, goalId?: number) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    // Guardar en savings_logs
+    await supabase.from('savings_logs').insert({
+      user_id: session.user.id,
+      amount,
+      goal_id: goalId || null,
+    });
+
+    // Si eligió una meta, actualizar el current_amount de la primera submeta con espacio
+    if (goalId) {
+      const { data: subgoals } = await supabase
+        .from('savings_subgoals')
+        .select('*')
+        .eq('goal_id', goalId)
+        .order('created_at', { ascending: true });
+
+      if (subgoals && subgoals.length > 0) {
+        let remaining = amount;
+        for (const sub of subgoals) {
+          if (remaining <= 0) break;
+          const space = sub.target_amount - sub.current_amount;
+          if (space <= 0) continue;
+          const toAdd = Math.min(remaining, space);
+          await supabase.from('savings_subgoals')
+            .update({ current_amount: sub.current_amount + toAdd })
+            .eq('id', sub.id);
+          remaining -= toAdd;
+        }
+      } else {
+        // No hay submetas, actualizar goal directamente no es necesario
+        // El progreso se calcula desde savings_logs
+      }
+    }
+
+    fetchEverything();
+  };
 
   // CALCULOS
   const totalIncome = incomes.reduce((acc, curr) => acc + curr.amount, 0); 
@@ -223,7 +261,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 text-gray-800 flex flex-col md:flex-row font-sans relative pt-16">
       
       {loading && <div className="absolute inset-0 bg-white/80 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={48} /></div>}
-      {showSavingsModal && <AddSavingsModal onClose={() => setShowSavingsModal(false)} onAdd={handleAddSavings} />}
+      {showSavingsModal && <AddSavingsModal onClose={() => setShowSavingsModal(false)} onAdd={(amount, goalId) => handleAddSavings(amount, goalId)} />}
       {showProfileModal && <EditProfileModal currentName={userProfile.name} currentAvatar={userProfile.avatar} onClose={() => setShowProfileModal(false)} onSave={handleUpdateProfile} />}
       
       {showIncomeModal && (
