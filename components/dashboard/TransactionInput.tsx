@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import MonaditaChat from './MonaditaChat';
 import { Plus, Wallet, Tag, Layers, Zap, DollarSign, Percent, AlertCircle, CreditCard, TrendingDown, ChevronDown } from 'lucide-react';
 
 interface TransactionInputProps {
@@ -9,6 +10,7 @@ const IPC_MENSUAL = 0.034;
 
 export default function TransactionInput({ onAdd }: TransactionInputProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const [refundType, setRefundType] = useState<'amount' | 'percentage'>('amount');
   const [showRefund, setShowRefund] = useState(false);
 
@@ -52,8 +54,7 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
   };
 
   const monto = Number(newTx.amount) || 0;
-  // FIX: cuotas mínimo es 1, no 2
-  const cuotas = Math.max(1, Number(newTx.installments) || 1);
+  const cuotas = Number(newTx.installments) || 1;
   const refundInputVal = Number(newTx.refund) || 0;
   const capVal = Number(newTx.refundCap) || 0;
   const isCash = newTx.bank === 'Efectivo';
@@ -89,7 +90,21 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
 
   return (
     <div className="mb-8 relative z-20">
+      {showChat && (
+        <MonaditaChat
+          onAdd={(tx) => { onAdd(tx); setShowChat(false); }}
+          onClose={() => setShowChat(false)}
+        />
+      )}
+
       {!isExpanded ? (
+        <div className="space-y-3">
+          <button
+            onClick={() => setShowChat(!showChat)}
+            className="w-full bg-slate-900 text-white font-bold py-3 rounded-2xl flex items-center justify-center gap-2 text-sm hover:bg-slate-700 transition-colors"
+          >
+            🪙 Modo fácil — Decile a Monedita
+          </button>
         <div className="relative group w-full">
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 rounded-2xl blur-lg opacity-70 group-hover:opacity-100 transition duration-200 animate-pulse" />
           <button
@@ -103,6 +118,7 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
               Registrar Nuevo Gasto
             </span>
           </button>
+        </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl shadow-2xl border border-slate-100 animate-fade-in-down ring-4 ring-slate-50/50">
@@ -199,7 +215,7 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Financiación</label>
-              <div className={`flex items-center justify-between px-3 border rounded-xl h-[50px] cursor-pointer transition-all ${newTx.isCredit ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`} onClick={() => setNewTx({ ...newTx, isCredit: !newTx.isCredit, installments: '1' })}>
+              <div className={`flex items-center justify-between px-3 border rounded-xl h-[50px] cursor-pointer transition-all ${newTx.isCredit ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`} onClick={() => setNewTx({ ...newTx, isCredit: !newTx.isCredit })}>
                 <span className={`text-sm font-bold select-none ${newTx.isCredit ? 'text-blue-700' : 'text-slate-600'}`}>¿Es en cuotas?</span>
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${newTx.isCredit ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
                   {newTx.isCredit && <Plus size={14} className="text-white rotate-45" />}
@@ -208,23 +224,23 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
             </div>
           </div>
 
-          {/* ══ CUOTAS ══ — solo si isCredit */}
+          {/* ══ CUOTAS ══ */}
           {newTx.isCredit && (
-            <div className="mb-4">
+            <div className="space-y-4 mb-6">
+
+              {/* BLOQUE 1: CUOTAS */}
               <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100">
                 <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-3">Cantidad de cuotas</p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* FIX: arranca desde 1 cuota */}
-                  {[1, 2, 3, 6, 9, 12, 18, 24].map((n) => (
+                  {[2, 3, 6, 9, 12, 18, 24].map((n) => (
                     <button key={n} type="button" onClick={() => setNewTx({ ...newTx, installments: String(n) })}
                       className={`px-4 py-2 rounded-xl text-sm font-black border transition-all ${Number(newTx.installments) === n ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>
                       {n}x
                     </button>
                   ))}
-                  {/* FIX: min="1" en lugar de min="2" */}
-                  <input type="number" min="1" max="60" placeholder="Otro"
+                  <input type="number" min="2" max="60" placeholder="Otro"
                     className="w-20 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200 text-center"
-                    value={![1,2,3,6,9,12,18,24].includes(Number(newTx.installments)) ? newTx.installments : ''}
+                    value={![2,3,6,9,12,18,24].includes(Number(newTx.installments)) ? newTx.installments : ''}
                     onChange={(e) => setNewTx({ ...newTx, installments: e.target.value })} />
                 </div>
 
@@ -251,82 +267,72 @@ export default function TransactionInput({ onAdd }: TransactionInputProps) {
                   </div>
                 )}
               </div>
-            </div>
-          )}
 
-          {/* ══ DESCUENTO / REINTEGRO ══ — siempre visible, colapsable */}
-          <div className="border border-slate-200 rounded-2xl overflow-hidden mb-6">
-            <button type="button" onClick={() => setShowRefund(!showRefund)}
-              className="w-full flex items-center justify-between px-5 py-3 bg-slate-50 hover:bg-slate-100 transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-600">¿Tenés descuento, reintegro o cashback?</span>
-                <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Opcional</span>
-              </div>
-              <ChevronDown size={16} className={`text-slate-400 transition-transform ${showRefund ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showRefund && (
-              <div className="p-5 bg-white border-t border-slate-100">
-
-                {/* Header "Configurar descuento" arriba del toggle */}
-                <div className="mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Configurar descuento</p>
-                  <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
-                    <button type="button" onClick={() => setRefundType('amount')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 ${refundType === 'amount' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                      <DollarSign size={14} /> Monto Fijo
-                    </button>
-                    <button type="button" onClick={() => setRefundType('percentage')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 ${refundType === 'percentage' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                      <Percent size={14} /> Porcentaje
-                    </button>
+              {/* BLOQUE 2: REINTEGRO (colapsable) */}
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <button type="button" onClick={() => setShowRefund(!showRefund)}
+                  className="w-full flex items-center justify-between px-5 py-3 bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-slate-600">¿Tenés reintegro o cashback?</span>
+                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Opcional</span>
                   </div>
-                </div>
+                  <ChevronDown size={16} className={`text-slate-400 transition-transform ${showRefund ? 'rotate-180' : ''}`} />
+                </button>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className={refundType === 'percentage' ? 'md:col-span-6' : 'md:col-span-12'}>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{refundType === 'amount' ? 'Monto del descuento' : 'Porcentaje (%)'}</label>
-                    <div className="relative">
-                      <input type="number" placeholder={refundType === 'amount' ? 'Ej: 2000' : 'Ej: 30'}
-                        className="w-full bg-green-50 border border-green-200 text-green-700 font-bold rounded-xl px-4 pl-9 outline-none focus:ring-2 focus:ring-green-200 h-[44px]"
-                        value={newTx.refund} onChange={(e) => setNewTx({ ...newTx, refund: e.target.value })} />
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500">{refundType === 'amount' ? <DollarSign size={16} /> : <Percent size={16} />}</div>
-                    </div>
-                  </div>
-                  {refundType === 'percentage' && (
-                    <div className="md:col-span-6">
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tope máximo (opcional)</label>
-                        {monto > 0 && refundInputVal > 0 && (
-                          <span className="text-[10px] text-slate-400 font-bold">
-                            sin tope: <span className="text-green-600">-${((monto * refundInputVal) / 100).toLocaleString('es-AR', { maximumFractionDigits: 0 })}</span>
-                          </span>
-                        )}
+                {showRefund && (
+                  <div className="p-5 bg-white border-t border-slate-100">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                      <div className="md:col-span-4">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Tipo</label>
+                        <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
+                          <button type="button" onClick={() => setRefundType('amount')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 ${refundType === 'amount' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                            <DollarSign size={14} /> Monto fijo
+                          </button>
+                          <button type="button" onClick={() => setRefundType('percentage')} className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1 ${refundType === 'percentage' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                            <Percent size={14} /> Porcentaje
+                          </button>
+                        </div>
                       </div>
-                      <div className="relative">
-                        <input type="number" placeholder="Ej: 5000"
-                          className="w-full bg-white border border-slate-200 text-slate-600 font-bold rounded-xl px-4 pl-9 outline-none focus:ring-2 focus:ring-slate-200 h-[44px]"
-                          value={newTx.refundCap} onChange={(e) => setNewTx({ ...newTx, refundCap: e.target.value })} />
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><AlertCircle size={16} /></div>
+                      <div className="md:col-span-4">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{refundType === 'amount' ? 'Monto del reintegro' : 'Porcentaje (%)'}</label>
+                        <div className="relative">
+                          <input type="number" placeholder={refundType === 'amount' ? 'Ej: 2000' : 'Ej: 30'}
+                            className="w-full bg-green-50 border border-green-200 text-green-700 font-bold rounded-xl px-4 pl-9 outline-none focus:ring-2 focus:ring-green-200 h-[44px]"
+                            value={newTx.refund} onChange={(e) => setNewTx({ ...newTx, refund: e.target.value })} />
+                          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-green-500">{refundType === 'amount' ? <DollarSign size={16} /> : <Percent size={16} />}</div>
+                        </div>
                       </div>
+                      {refundType === 'percentage' && (
+                        <div className="md:col-span-4">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Tope máximo (opcional)</label>
+                          <div className="relative">
+                            <input type="number" placeholder="Ej: 5000"
+                              className="w-full bg-white border border-slate-200 text-slate-600 font-bold rounded-xl px-4 pl-9 outline-none focus:ring-2 focus:ring-slate-200 h-[44px]"
+                              value={newTx.refundCap} onChange={(e) => setNewTx({ ...newTx, refundCap: e.target.value })} />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><AlertCircle size={16} /></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {reintegroEstimado > 0 && (
-                  <div className="mt-4 bg-green-50 border border-green-100 rounded-xl p-4 flex justify-between items-center">
-                    <div>
-                      <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Descuento estimado</p>
-                      <p className="text-lg font-black text-green-700">-${reintegroEstimado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
-                      {aplicoTope && <p className="text-[10px] text-orange-500 font-bold">* Tope de ${capVal} aplicado</p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Costo real final</p>
-                      <p className="text-2xl font-black text-slate-800">${costoReal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
-                    </div>
+                    {reintegroEstimado > 0 && (
+                      <div className="mt-4 bg-green-50 border border-green-100 rounded-xl p-4 flex justify-between items-center">
+                        <div>
+                          <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">Reintegro estimado</p>
+                          <p className="text-lg font-black text-green-700">-${reintegroEstimado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                          {aplicoTope && <p className="text-[10px] text-orange-500 font-bold">* Tope de ${capVal} aplicado</p>}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Costo real final</p>
+                          <p className="text-2xl font-black text-slate-800">${costoReal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <button type="submit" className="w-full bg-black text-white font-black py-4 rounded-xl hover:bg-slate-800 transition-all shadow-lg transform active:scale-[0.99] flex justify-center items-center gap-2 text-lg">
             GUARDAR GASTO <Plus size={24} />
